@@ -1,4 +1,6 @@
 import Cartesian3 from 'cesium/Core/Cartesian3.js';
+import CMath from 'cesium/Core/Math';
+
 
 export async function readTextFile(url) {
   const response = await fetch(url);
@@ -31,4 +33,47 @@ export function getURLSearchParams() {
  */
 export function setURLSearchParams(params) {
   window.history.replaceState({}, '', `${location.pathname}?${params}`);
+}
+
+/**
+ * @param {string} id
+ */
+export function clickOnElement(id) {
+  document.getElementById(id).click();
+}
+
+
+export function onAccordionClick(evt) {
+  let target = evt.target;
+  while (!target.classList.contains('title')) {
+    target = target.parentElement;
+  }
+  if (!target.nextElementSibling) return;
+  target.classList.toggle('active');
+  target.nextElementSibling.classList.toggle('active');
+}
+
+/**
+ * Change element position in array
+ * array - target array
+ * fromIdx - from index
+ * toIdx - to index
+ */
+export function insertAndShift(array, fromIdx, toIdx) {
+  const cutOut = array.splice(fromIdx, 1)[0];
+  array.splice(toIdx, 0, cutOut);
+  return array;
+}
+
+export function verticalDirectionRotate(camera, angle) {
+  const position = Cartesian3.normalize(camera.position, new Cartesian3());
+  const up = Cartesian3.normalize(camera.up, new Cartesian3());
+
+  const pitch = CMath.toDegrees(camera.pitch);
+  if (pitch < -90 || pitch > 0) {
+    angle = -angle;
+  }
+
+  const tangent = Cartesian3.cross(up, position, new Cartesian3());
+  camera.rotate(tangent, angle);
 }

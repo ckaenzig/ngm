@@ -1,33 +1,69 @@
 // @ts-check
+import {initSentry} from './sentry.js';
 import {setupI18n} from './i18n.js';
 import {SWITZERLAND_RECTANGLE, DRILL_PICK_LIMIT} from './constants.js';
 
 import './style/index.css';
-import {setupLayers} from './layers.js';
 import {setupSearch} from './search.js';
 import {setupViewer, addMantelEllipsoid} from './viewer.js';
-import FirstPersonCameraMode from './FirstPersonCameraMode.js';
 
 import './elements/ngm-object-information.js';
+import './elements/ngm-gst-interaction.js';
+import './elements/ngm-navigation-widgets.js';
 import ScreenSpaceEventType from 'cesium/Core/ScreenSpaceEventType.js';
-import {extractPrimitiveAttributes} from './objectInformation.js';
+import {extractPrimitiveAttributes, extractEntitiesAttributes, isPickable} from './objectInformation.js';
 
 import {getCameraView, syncCamera} from './permalink.js';
+import AreaOfInterestDrawer from './areaOfInterest/AreaOfInterestDrawer.js';
 import Color from 'cesium/Core/Color.js';
-import JulianDate from 'cesium/Core/JulianDate.js';
 import PostProcessStageLibrary from 'cesium/Scene/PostProcessStageLibrary.js';
+import {initInfoPopup} from './elements/keyboard-info-popup.js';
+import LayerTree from './layers/layers.js';
+import HeadingPitchRange from 'cesium/Core/HeadingPitchRange.js';
+import {setupWebComponents} from './elements/appElements.js';
+import {showConfirmationMessage} from './message.js';
+import i18next from 'i18next';
 
+initSentry();
 setupI18n();
 
 const viewer = setupViewer(document.querySelector('#cesium'));
+setupWebComponents(viewer);
 
+async function zoomTo(config) {
+  const p = await config.promise;
+  if (p.boundingSphere) {
+    const zoomHeadingPitchRange = new HeadingPitchRange(0, Math.PI / 4, 3 * p.boundingSphere.radius);
+    this.viewer.camera.flyToBoundingSphere(p.boundingSphere, {
+      duration: 0,
+      offset: zoomHeadingPitchRange
+    });
+  } else {
+    this.viewer.zoomTo(p);
+  }
+}
+
+// Temporarily increasing the maximum screen space error to load low LOD tiles.
+const originMaximumScreenSpaceError = viewer.scene.globe.maximumScreenSpaceError;
+viewer.scene.globe.maximumScreenSpaceError = 10000;
 const unlisten = viewer.scene.globe.tileLoadProgressEvent.addEventListener(() => {
   if (viewer.scene.globe.tilesLoaded) {
     unlisten();
+    viewer.scene.globe.maximumScreenSpaceError = originMaximumScreenSpaceError;
     window.requestAnimationFrame(() => {
       addMantelEllipsoid(viewer);
-      setupLayers(viewer, document.getElementById('layers'));
+
+      const layerTree = new LayerTree(viewer, document.getElementById('layers'), zoomTo);
+      setupSearch(viewer, document.querySelector('ga-search'), layerTree);
       document.getElementById('loader').style.display = 'none';
+      console.log(`loading mask displayed ${(performance.now() / 1000).toFixed(3)}s`);
+
+      const sentryConfirmed = localStorage.getItem('sentryConfirmed') === 'true';
+      if (!sentryConfirmed) {
+        showConfirmationMessage(i18next.t('sentry_message'), i18next.t('ok_btn_label'), () => {
+          localStorage.setItem('sentryConfirmed', 'true');
+        });
+      }
     });
   }
 });
@@ -53,19 +89,18 @@ viewer.screenSpaceEventHandler.setInputAction(click => {
   let attributes = null;
 
   if (objects.length > 0) {
-    let object = objects[0];
-    if (!object.getProperty) {
-      object = object.primitive;
+    const object = objects[0];
+    if (!isPickable(object)) {
+      return;
     }
     if (object.getPropertyNames) {
       attributes = extractPrimitiveAttributes(object);
       // attributes.zoom = () => console.log('should zoom to', objects[0]);
       silhouette.selected = [object];
-    } else if (objects[0].id && objects[0].id.properties) {
-      const curentDate = JulianDate.fromDate(new Date());
-      const props = objects[0].id.properties.getValue(curentDate);
+    } else if (object.id && object.id.properties) {
+      const props = extractEntitiesAttributes(object.id);
       attributes = {...props};
-      attributes.zoom = () => viewer.zoomTo(objects[0].id, props.zoomHeadingPitchRange);
+      attributes.zoom = () => viewer.zoomTo(object.id, props.zoomHeadingPitchRange);
       if (attributes.zoomHeadingPitchRange) {
         // Don't show the value in the object info window
         delete attributes.zoomHeadingPitchRange;
@@ -81,12 +116,6 @@ viewer.screenSpaceEventHandler.setInputAction(click => {
 
 }, ScreenSpaceEventType.LEFT_CLICK);
 
-
-viewer.screenSpaceEventHandler.setInputAction(movement => {
-  viewer.scene.canvas.style.cursor = viewer.scene.pick(movement.endPosition) ? 'pointer' : 'default';
-}, ScreenSpaceEventType.MOUSE_MOVE);
-
-
 const {destination, orientation} = getCameraView();
 viewer.camera.flyTo({
   destination: destination || SWITZERLAND_RECTANGLE,
@@ -96,16 +125,9 @@ viewer.camera.flyTo({
 
 viewer.camera.moveEnd.addEventListener(() => syncCamera(viewer.camera));
 
-document.querySelector('#zoomToHome').addEventListener('click', event => {
-  viewer.scene.camera.flyTo({
-    destination: SWITZERLAND_RECTANGLE
-  });
-});
+new AreaOfInterestDrawer(viewer);
 
-const firstPersonCameraMode = new FirstPersonCameraMode(viewer.scene);
+initInfoPopup();
 
-document.querySelector('#fpsMode').addEventListener('click', event => {
-  firstPersonCameraMode.active = true;
-});
-
-setupSearch(viewer, document.querySelector('ga-search'));
+const widgets = document.querySelector('ngm-navigation-widgets');
+widgets.viewer = viewer;

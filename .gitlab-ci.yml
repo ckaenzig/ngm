@@ -23,13 +23,9 @@ lint:
   stage: test
   script: npm run lint
 
-typecheck:
-  stage: test
-  script: npm run typecheck
-
 build:
   stage: build
-  script: npm run build
+  script: RELEASE_NAME=$CI_COMMIT_REF_NAME npm run build
   artifacts:
     paths:
       - dist/

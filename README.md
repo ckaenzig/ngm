@@ -1,7 +1,15 @@
+# Instances
+
+- dev https://ngmpub.dev.bgdi.ch/
+- int https://ngmpub.int.bgdi.ch/
+- prod https://ngmpub.prod.bgdi.ch/ (username: agch, password: OhnooTh1)
+
 # Deploy to integration (from local machine)
 
 ```bash
-# ex: int_sprint2.1
+RELEASE_NAME="RELEASE_NAME_FOR_SENTRY" npm run build
+
+# ex int_sprint2.1
 export VERSION="int_sprint???"
 
 git tag $VERSION
@@ -9,8 +17,9 @@ git push origin $VERSION
 ```
 
 # Deploy to production (from local machine)
-
 ```bash
+RELEASE_NAME="RELEASE_NAME_FOR_SENTRY" npm run build
+
 export VERSION="THE_TAG_YOU_WANT_DEPLOYED"
 
 git checkout $VERSION
@@ -36,6 +45,10 @@ Then, run the `npm run extract-i18n` command to add this new key (`text_key`) to
 # Gitlab <> Jira integration
 
 See https://docs.gitlab.com/ee/user/project/integrations/jira.html
+
+# URL Parameters
+- `noLimit` disable the navigation limits (sphere and lava)
+- `assetIds` display some additionnal Cesium ION 3dtilesets (coma separated list of CesiumIon ids)
 
 # Notes
 

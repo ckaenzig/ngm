@@ -56,7 +56,7 @@ export function setupI18n() {
     returnEmptyString: false,
     fallbackLng: 'en',
     //load: 'languageOnly',
-    debug: true,
+    debug: false,
     backend: {
       loadPath: 'locales/{{lng}}.json'
     }
@@ -69,15 +69,23 @@ export function setupI18n() {
     localize('[data-i18n]');
   });
 
-  const templates = SUPPORTED_LANGUAGES.map(lang => {
-    const onclick = evt => {
-      i18next.changeLanguage(lang);
-      evt.preventDefault();
-    };
-    return html`
-      <a class="item lang-${lang}" @click="${onclick}">${lang.toUpperCase()}</a>
-    `;
-  });
+  const templates = SUPPORTED_LANGUAGES.map(lang => html`
+    <div class="item lang-${lang}" @click="${() => i18next.changeLanguage(lang)}">${lang.toUpperCase()}</div>
+  `);
   render(templates, document.getElementById('langs'));
 
 }
+
+export const I18nMixin = Base => class extends Base {
+
+  connectedCallback() {
+    this.i18nLanguageChangedCallback_ = () => this.requestUpdate();
+    i18next.on('languageChanged', this.i18nLanguageChangedCallback_);
+    super.connectedCallback();
+  }
+
+  disconnectedCallback() {
+    i18next.off('languageChanged', this.i18nLanguageChangedCallback_);
+    super.disconnectedCallback();
+  }
+};

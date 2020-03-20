@@ -5,12 +5,15 @@ import {parseEarthquakeData, EARTHQUAKE_SPHERE_SIZE_COEF, getColorForMagnitude} 
 import {readTextFile} from '../utils.js';
 import HeadingPitchRange from 'cesium/Core/HeadingPitchRange.js';
 import Math from 'cesium/Core/Math.js';
+import {LAYER_TYPES} from '../constants.js';
+import BoundingSphere from 'cesium/Core/BoundingSphere.js';
 
 export default class EarthquakeVisualizer {
   constructor(viewer) {
     this.viewer = viewer;
-    this.earthquakeDataSource = new CustomDataSource('earthquakes');
+    this.earthquakeDataSource = new CustomDataSource(LAYER_TYPES.earthquakes);
     this.viewer.dataSources.add(this.earthquakeDataSource);
+    this.boundingSphere = null;
     this.earthquakeDataSource.entities.collectionChanged.addEventListener(() => {
       this.viewer.scene.requestRender();
     });
@@ -25,8 +28,12 @@ export default class EarthquakeVisualizer {
       const longitude = Number(data.Longitude);
       const latitude = Number(data.Latitude);
       const position = Cartesian3.fromDegrees(longitude, latitude, height);
-      const cameraDistanse = size * 4;
-      const zoomHeadingPitchRange = new HeadingPitchRange(0, Math.toRadians(25), cameraDistanse);
+      const cameraDistance = size * 4;
+      const zoomHeadingPitchRange = new HeadingPitchRange(0, Math.toRadians(25), cameraDistance);
+      if (!this.boundingSphere) {
+        this.boundingSphere = new BoundingSphere(position, size);
+      }
+      BoundingSphere.expand(this.boundingSphere, position, this.boundingSphere);
       return this.earthquakeDataSource.entities.add({
         position: position,
         ellipsoid: {
@@ -49,5 +56,12 @@ export default class EarthquakeVisualizer {
     } else {
       await this.showEarthquakes();
     }
+  }
+
+  setOpacity(opacity) {
+    const entities = this.earthquakeDataSource.entities.values;
+    entities.forEach(entity => {
+      entity.ellipsoid.material = entity.ellipsoid.material.color.getValue().withAlpha(Number(opacity));
+    });
   }
 }

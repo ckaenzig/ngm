@@ -37,25 +37,32 @@
       <ul class="search-results"></ul>
     </ga-search>
     <div style="flex: auto;"></div>
-    <div id="langs" class="ui horizontal selection list"></div>
+    <div class="ngm-header-links">
+      <div id="langs" class="ui horizontal selection list"></div>
+      <a href="https://findmind.ch/c/XmNb9jKz2w" target="_blank" data-i18n="review_link"></a>
+    </div>
   </header>
   <main class="ui dimmable dimmed">
     <div id="loader" class="ui active inverted dimmer">
       <div class="ui text loader" data-i18n="loading_message"></div>
     </div>
     <div class="left sidebar">
-      <div id="layers" class="ui segments"></div>
+      <div class="ui styled accordion" id="layers"></div>
+      <div id="areasOfInterest" class="ui styled accordion"></div>
+      <ngm-gst-accordion></ngm-gst-accordion>
     </div>
     <div id="cesium">
-      <div id="zoomToHome"><img src="src/images/ch.png"></div>
-
-      <div class="ui icon vertical buttons">
-        <!-- <button class="ui button">
-          <i class="home icon"></i>
-        </button> -->
-        <button id="fpsMode" class="ui button">
-          <i class="eye icon"></i>
+      <div class="navigation-widgets">
+        <ngm-navigation-widgets></ngm-navigation-widgets>
+        <button
+          id="navigationInfoBtn"
+          class="ui compact mini icon button"
+          data-position="left center"
+          data-variation="mini"
+          data-i18n="[data-tooltip]info_btn">
+          <i class="info icon"></i>
         </button>
+        <div id="navigationInfo" class="ui basic popup left center"></div>
       </div>
       <ngm-object-information></ngm-object-information>
     </div>
@@ -76,6 +83,7 @@
   </script>
   <script nomodule>
     document.querySelector('#outdated-browser').style.display = '';
+    document.querySelector('#loader').style.display = 'none';
   </script>
 </body>
 
