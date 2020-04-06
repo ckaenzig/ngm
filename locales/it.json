@@ -77,10 +77,17 @@
   "unsupported_kml_warning": "",
   "upload_btn_label": "",
   "Vertical cross sections": "",
+  "Your position": "",
   "zoom_in_btn": "",
   "zoom_out_btn": "",
   "zoom_to": "",
   "zoom_to_object": "",
   "sentry_message": "",
-  "ok_btn_label": ""
+  "ok_btn_label": "",
+  "top_dogger_label": "",
+  "base_cenozoic_label": "",
+  "top_lower_freshwater_molasse_label": "",
+  "top_bedrock_label": "",
+  "up_btn": "",
+  "down_btn": ""
 }

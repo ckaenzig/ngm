@@ -1,11 +1,21 @@
 import Rectangle from 'cesium/Core/Rectangle.js';
 import Color from 'cesium/Core/Color.js';
+import Cartesian3 from 'cesium/Core/Cartesian3.js';
+import CMath from 'cesium/Core/Math.js';
 import LabelStyle from 'cesium/Scene/LabelStyle.js';
 
 
 export const SWITZERLAND_BOUNDS = [5.140242, 45.398181, 11.47757, 48.230651];
 
 export const SWITZERLAND_RECTANGLE = Rectangle.fromDegrees(...SWITZERLAND_BOUNDS);
+
+export const DEFAULT_VIEW = {
+  destination: new Cartesian3(4908864.293775153, 703132.7307690362, 4556988.123570525),
+  orientation: {
+    heading: CMath.toRadians(2.0),
+    pitch: CMath.toRadians(-40.0)
+  }
+};
 
 export const SUPPORTED_LANGUAGES = ['de', 'fr', 'it', 'en'];
 export const DRILL_PICK_LIMIT = 1;
@@ -28,6 +38,7 @@ export const LAYERS_URL_PARAM = 'layers';
 export const LAYERS_VISIBILITY_URL_PARAM = 'layers_visibility';
 export const LAYERS_OPACITY_URL_PARAM = 'layers_opacity';
 export const ASSET_IDS_URL_PARAM = 'assetIds';
+export const BILLBOARDS_PREFIX = 'billboards_';
 
 export const DEFAULT_AOI_COLOR = Color.BLACK.withAlpha(0.3);
 export const HIGHLIGHTED_AOI_COLOR = Color.YELLOW.withAlpha(0.3);
@@ -46,8 +57,20 @@ export const SWISSTOPO_LABEL_STYLE = {
   anchorLineEnabled: false,
   heightOffset: 200,
   pointSize: 0,
-  labelColor: 'color("black")',
-  font: '"bold 32px arial"',
+  labelColor: {
+    conditions: [
+      ['${OBJEKTART} === "See"', 'color("blue")'],
+      ['true', 'color("black")']
+    ]
+  },
+  labelOutlineColor: 'color("white", 1)',
+  labelOutlineWidth: 5,
+  font: {
+    conditions: [
+      ['${OBJEKTART} === "See"', '"bold 32px arial"'],
+      ['true', '"32px arial"']
+    ]
+  },
   scaleByDistance: {
     conditions: [
       ['${LOD} === "7"', 'vec4(1000, 1, 5000, 0.4)'],
@@ -95,3 +118,190 @@ export const TUNNEL_STYLE = {
       ]
     }
 };
+
+const t = a => a;
+const geo_map_series = {
+  label: t('geological_map_series_label'),
+  children: [
+    {
+      label: t('geological_maps_label'),
+      children: [
+        {
+          type: LAYER_TYPES.swisstopoWMTS,
+          label: t('ch_swisstopo_geologie_geocover'),
+          layer: 'ch.swisstopo.geologie-geocover',
+          visible: true,
+          displayed: true,
+          opacity: DEFAULT_LAYER_OPACITY,
+        // }, {
+        //   type: LAYER_TYPES.swisstopoWMTS,
+        //   label: t('ch.swisstopo.pixelkarte-farbe'),
+        //   layer: 'ch.swisstopo.pixelkarte-farbe',
+        //   visible: true,
+        //   displayed: true,
+        //   opacity: DEFAULT_LAYER_OPACITY,
+        // }, {
+        //   type: LAYER_TYPES.swisstopoWMTS,
+        //   label: t('ch.swisstopo.swisstlm3d-wanderwege'),
+        //   layer: 'ch.swisstopo.swisstlm3d-wanderwege',
+        //   visible: true,
+        //   displayed: true,
+        //   opacity: DEFAULT_LAYER_OPACITY,
+        },
+      ]
+    },
+  ]
+};
+const geo_base = {
+  label: t('geological_bases_label'),
+  children: [
+    {
+      label: t('borehole_data_profiles_label'),
+      children: [
+        {
+          type: LAYER_TYPES.tiles3d,
+          assetId: 68857,
+          label: t('boreholes_label'),
+          layer: 'boreholes',
+          opacity: DEFAULT_LAYER_OPACITY,
+          pickable: true,
+          billboards: {
+            lonPropName: 'Longitude',
+            latPropName: 'Latitude'
+          }
+        }, {
+          type: LAYER_TYPES.tiles3d,
+          assetId: 68881,
+          label: t('cross_section_label'),
+          layer: 'cross_section',
+          opacity: DEFAULT_LAYER_OPACITY,
+          pickable: true
+        },
+      ]
+    },
+  ]
+};
+
+const geo_energy = {
+  label: t('geo_energy_label'),
+  children: [
+    {
+      label: t('geothermal_energy_label'),
+      children: [
+        {
+          type: LAYER_TYPES.tiles3d,
+          style: LAS_POINT_CLOUD_STYLE,
+          assetId: 69922,
+          label: t('temperature_model_label'),
+          layer: 'temperature_model',
+          opacityDisabled: true
+        }
+      ]
+    },
+  ]
+};
+
+const natural_hazard = {
+  label: t('natural_hazard_label'),
+  children: [
+    {
+      type: LAYER_TYPES.earthquakes,
+      label: t('earthquakes_label'),
+      layer: 'earthquakes',
+      opacity: DEFAULT_LAYER_OPACITY
+    },
+  ]
+};
+
+const subsurface = {
+  label: t('subsurface_label'),
+  children: [
+    {
+      label: t('bedrock_surface_sediments_label'),
+      children: [
+        {
+          type: LAYER_TYPES.tiles3d,
+          assetId: 76814,
+          label: t('top_bedrock_label'),
+          layer: 'top_bedrock',
+          opacity: DEFAULT_LAYER_OPACITY,
+          pickable: true
+        },
+        {
+          type: LAYER_TYPES.tiles3d,
+          assetId: 76931,
+          label: t('top_lower_freshwater_molasse_label'),
+          layer: 'top_lower_freshwater_molasse',
+          opacity: DEFAULT_LAYER_OPACITY,
+          pickable: true
+        },
+        {
+          type: LAYER_TYPES.tiles3d,
+          assetId: 76815,
+          label: t('base_cenozoic_label'),
+          layer: 'base_cenozoic',
+          opacity: DEFAULT_LAYER_OPACITY,
+          pickable: true
+        },
+        {
+          type: LAYER_TYPES.tiles3d,
+          assetId: 76817,
+          label: t('top_dogger_label'),
+          layer: 'top_dogger',
+          opacity: DEFAULT_LAYER_OPACITY,
+          pickable: true
+        },
+        {
+          type: LAYER_TYPES.tiles3d,
+          assetId: 76816,
+          label: t('base_mesozoic_label'),
+          layer: 'base_mesozoic',
+          opacity: DEFAULT_LAYER_OPACITY,
+          pickable: true
+        },
+      ]
+    },
+  ]
+};
+
+const man_made_objects = {
+  label: t('man_made_objects_label'),
+  children: [{
+      type: LAYER_TYPES.tiles3d,
+      assetId: 77319,
+      style: TUNNEL_STYLE,
+      label: t('tunnel_label'),
+      layer: 'tunnel',
+      pickable: true,
+      opacityDisabled: true
+    },
+  ]
+};
+
+const background = {
+  label: t('background_label'),
+  children: [
+    {
+      type: LAYER_TYPES.tiles3d,
+      url: 'https://vectortiles0.geo.admin.ch/3d-tiles/ch.swisstopo.swissnames3d.3d/20180716/tileset.json',
+      label: t('swissnames_label'),
+      style: SWISSTOPO_LABEL_STYLE,
+      layer: 'ch.swisstopo.swissnames3d.3d',
+      opacity: DEFAULT_LAYER_OPACITY
+    },
+    man_made_objects,
+  ]
+};
+
+
+// A "displayed" layer appears in the list of active layers.
+// A "visible" layer is actually shown on the globe.
+// Normally, visible => displayed
+export const defaultLayerTree = [
+  geo_map_series,
+  geo_base,
+  geo_energy,
+  natural_hazard,
+  subsurface,
+  background,
+];

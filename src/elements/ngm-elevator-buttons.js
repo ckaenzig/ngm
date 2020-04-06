@@ -2,9 +2,9 @@ import {LitElement, html} from 'lit-element';
 
 import i18next from 'i18next';
 import {I18nMixin} from '../i18n.js';
-import {DEFAULT_VIEW} from '../constants.js';
+import {setCameraHeight} from '../utils.js';
 
-class NgmZoomButtons extends I18nMixin(LitElement) {
+class NgmElevatorButtons extends I18nMixin(LitElement) {
 
   static get properties() {
     return {
@@ -18,29 +18,28 @@ class NgmZoomButtons extends I18nMixin(LitElement) {
 
     this.moveAmount = 200;
 
-    this.zoomingIn = false;
-    this.zoomingOut = false;
+    this.movingUp = false;
+    this.movingDown = false;
 
     this.unlistenFromPostRender = null;
-
-    this.stopZoomFunction = this.stopZoom.bind(this);
+    this.stopElevatorFunction = this.stopElevator.bind(this);
   }
 
   updated() {
     if (this.scene && !this.unlistenFromPostRender) {
       this.unlistenFromPostRender = this.scene.postRender.addEventListener(() => {
         const amount = Math.abs(this.scene.camera.positionCartographic.height) / this.moveAmount;
-        if (this.zoomingIn) {
-          this.scene.camera.moveForward(amount);
-        } else if (this.zoomingOut) {
-          this.scene.camera.moveBackward(amount);
+        if (this.movingUp) {
+          setCameraHeight(this.scene.camera, this.scene.camera.positionCartographic.height + amount);
+        } else if (this.movingDown) {
+          setCameraHeight(this.scene.camera, this.scene.camera.positionCartographic.height - amount);
         }
       });
     }
   }
 
   connectedCallback() {
-    document.addEventListener('pointerup', this.stopZoomFunction);
+    document.addEventListener('pointerup', this.stopElevatorFunction);
     super.connectedCallback();
   }
 
@@ -48,29 +47,25 @@ class NgmZoomButtons extends I18nMixin(LitElement) {
     if (this.unlistenFromPostRender) {
       this.unlistenFromPostRender();
     }
-    document.removeEventListener('pointerup', this.stopZoomFunction);
+    document.removeEventListener('pointerup', this.stopElevatorFunction);
     super.disconnectedCallback();
   }
 
-  startZoomIn(event) {
-    this.zoomingIn = true;
+  startMovingUp(event) {
+    this.movingUp = true;
     this.scene.requestRender();
     event.preventDefault();
   }
 
-  startZoomOut(event) {
-    this.zoomingOut = true;
+  startMovingDown(event) {
+    this.movingDown = true;
     this.scene.requestRender();
     event.preventDefault();
   }
 
-  stopZoom() {
-    this.zoomingIn = false;
-    this.zoomingOut = false;
-  }
-
-  flyToHome() {
-    this.scene.camera.flyTo(DEFAULT_VIEW);
+  stopElevator() {
+    this.movingUp = false;
+    this.movingDown = false;
   }
 
   render() {
@@ -78,28 +73,20 @@ class NgmZoomButtons extends I18nMixin(LitElement) {
       return html`
         <div class="ui vertical compact mini icon buttons">
           <button
-          data-tooltip=${i18next.t('zoom_in_btn')}
+          data-tooltip=${i18next.t('up_btn')}
           data-position="left center"
           data-variation="mini"
           class="ui button"
-          @pointerdown="${this.startZoomIn}">
-            <i class="plus icon"></i>
+          @pointerdown="${this.startMovingUp}">
+            <i class="angle up icon"></i>
           </button>
           <button
-          data-tooltip=${i18next.t('reset_view_btn')}
+          data-tooltip=${i18next.t('down_btn')}
           data-position="left center"
           data-variation="mini"
           class="ui button"
-          @click="${this.flyToHome}">
-            <i class="home icon"></i>
-          </button>
-          <button
-          data-tooltip=${i18next.t('zoom_out_btn')}
-          data-position="left center"
-          data-variation="mini"
-          class="ui button"
-          @pointerdown="${this.startZoomOut}">
-            <i class="minus icon"></i>
+          @pointerdown="${this.startMovingDown}">
+            <i class="angle down icon"></i>
           </button>
         </div>
       `;
@@ -114,4 +101,4 @@ class NgmZoomButtons extends I18nMixin(LitElement) {
   }
 }
 
-customElements.define('ngm-zoom-buttons', NgmZoomButtons);
+customElements.define('ngm-elevator-buttons', NgmElevatorButtons);
