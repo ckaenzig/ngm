@@ -1,149 +1,111 @@
-import ScreenSpaceEventHandler from 'cesium/Core/ScreenSpaceEventHandler.js';
 import ScreenSpaceEventType from 'cesium/Core/ScreenSpaceEventType.js';
-import Cartographic from 'cesium/Core/Cartographic.js';
-import Rectangle from 'cesium/Core/Rectangle.js';
 import Cartesian3 from 'cesium/Core/Cartesian3.js';
-import Ellipsoid from 'cesium/Core/Ellipsoid.js';
-import CallbackProperty from 'cesium/DataSources/CallbackProperty.js';
 import CustomDataSource from 'cesium/DataSources/CustomDataSource.js';
 import KmlDataSource from 'cesium/DataSources/KmlDataSource.js';
 import Entity from 'cesium/DataSources/Entity.js';
-import defined from 'cesium/Core/defined.js';
-import {render} from 'lit-html';
 import getTemplate from './areaOfInterestTemplate.js';
 import i18next from 'i18next';
-import {DEFAULT_AOI_COLOR, CESIUM_NOT_GRAPHICS_ENTITY_PROPS, AOI_DATASOURCE_NAME} from '../constants.js';
+
+import {LitElement} from 'lit-element';
+
+import {AOI_DATASOURCE_NAME, CESIUM_NOT_GRAPHICS_ENTITY_PROPS, DEFAULT_AOI_COLOR} from '../constants.js';
 import {updateColor} from './helpers.js';
 import {showWarning} from '../message.js';
+import {I18nMixin} from '../i18n';
+import {CesiumDraw} from '../draw/CesiumDraw.js';
+import ScreenSpaceEventHandler from 'cesium/Core/ScreenSpaceEventHandler.js';
 
-export default class AreaOfInterestDrawer {
-  constructor(viewer) {
-    this.viewer_ = viewer;
-    this.area_ = null;
-    this.areaRectangle_ = new Rectangle();
-    this.screenSpaceEventHandler_ = new ScreenSpaceEventHandler(this.viewer_.scene.canvas);
-    this.cartesian_ = new Cartesian3();
-    this.tempCartographic_ = new Cartographic();
-    this.firstPoint_ = new Cartographic();
-    this.firstPointSet_ = false;
-    this.camera_ = this.viewer_.camera;
-    this.selectedArea_ = null;
-    this.mouseDown_ = false;
-    this.drawMode_ = false;
-    this.areasCounter_ = 0;
+class NgmAreaOfInterestDrawer extends I18nMixin(LitElement) {
 
-    this.getAreaLocation = new CallbackProperty(this.getAreaLocationCallback_.bind(this), false);
-
-    this.screenSpaceEventHandler_.setInputAction(this.onClick_.bind(this), ScreenSpaceEventType.LEFT_CLICK);
-
-    this.interestAreasDataSource = new CustomDataSource(AOI_DATASOURCE_NAME);
-    this.viewer_.dataSources.add(this.interestAreasDataSource);
-
-    this.interestAreasDataSource.entities.collectionChanged.addEventListener(() => {
-      this.viewer_.scene.requestRender();
-      this.doRender_();
-    });
-    i18next.on('languageChanged', options => {
-      this.doRender_();
-    });
-    this.doRender_();
+  static get properties() {
+    return {
+      viewer: {type: Object},
+      selectedArea_: {type: Object}
+    };
   }
 
-  startDrawing_() {
-    this.viewer_.scene.screenSpaceCameraController.enableTranslate = false;
-    this.viewer_.scene.screenSpaceCameraController.enableTilt = false;
-    this.viewer_.scene.screenSpaceCameraController.enableLook = false;
-    this.viewer_.scene.screenSpaceCameraController.enableRotate = false;
+  update(changedProperties) {
+    if (!this.aoiInited && this.viewer) {
+      this.initAoi();
+    }
+    super.update(changedProperties);
+  }
 
 
-    this.areasCounter_ = this.areasCounter_ + 1;
-    this.area_ = this.interestAreasDataSource.entities.add({
-      selectable: false,
-      show: false,
+  disconnectedCallback() {
+    if (this.screenSpaceEventHandler) {
+      this.screenSpaceEventHandler.destroy();
+    }
+  }
+
+  initAoi() {
+    this.selectedArea_ = null;
+    this.areasCounter_ = 0;
+    this.areasClickable = true;
+    this.draw_ = new CesiumDraw(this.viewer, 'polygon', {
+      fillColor: DEFAULT_AOI_COLOR
+    });
+    this.draw_.active = false;
+    this.interestAreasDataSource = new CustomDataSource(AOI_DATASOURCE_NAME);
+    this.viewer.dataSources.add(this.interestAreasDataSource);
+
+    this.draw_.addEventListener('drawend', this.endDrawing_.bind(this));
+    this.draw_.addEventListener('statechanged', () => this.requestUpdate());
+    this.draw_.addEventListener('drawerror', evt => {
+      if (this.draw_.ERROR_TYPES.needMorePoints === evt.detail.error) {
+        showWarning(i18next.t('error_need_more_points'));
+      }
+    });
+
+    this.screenSpaceEventHandler = new ScreenSpaceEventHandler(this.viewer.canvas);
+    this.screenSpaceEventHandler.setInputAction(this.onClick_.bind(this), ScreenSpaceEventType.LEFT_CLICK);
+    this.interestAreasDataSource.entities.collectionChanged.addEventListener(() => {
+      this.viewer.scene.requestRender();
+      this.requestUpdate();
+    });
+
+    this.aoiInited = true;
+  }
+
+  endDrawing_(event) {
+    this.draw_.active = false;
+    this.draw_.clear();
+
+    // wgs84 to Cartesian3
+    const positions = Cartesian3.fromDegreesArrayHeights(event.detail.positions.flat());
+    this.areasCounter_ += 1;
+    this.interestAreasDataSource.entities.add({
       name: `Area ${this.areasCounter_}`,
-      rectangle: {
-        coordinates: this.getAreaLocation,
+      polygon: {
+        hierarchy: positions,
         material: DEFAULT_AOI_COLOR
       }
     });
-
-    this.mouseDown_ = true;
-    this.drawMode_ = true;
-    this.area_.rectangle.coordinates = this.getAreaLocation;
   }
 
-  endDrawing_() {
-    this.viewer_.scene.screenSpaceCameraController.enableTranslate = true;
-    this.viewer_.scene.screenSpaceCameraController.enableTilt = true;
-    this.viewer_.scene.screenSpaceCameraController.enableLook = true;
-    this.viewer_.scene.screenSpaceCameraController.enableRotate = true;
-
-    this.mouseDown_ = false;
-    this.firstPointSet_ = false;
-
-    if (this.drawMode_) {
-      this.cancelDraw_();
-    }
-
-    if (this.areaRectangle_.width === 0 || this.areaRectangle_.height === 0) {
-      this.interestAreasDataSource.entities.removeById(this.area_.id);
-      this.areasCounter_ = this.areasCounter_ - 1;
-      this.onAddAreaClick_();
-    } else {
-      this.area_.rectangle.coordinates = this.areaRectangle_;
-      this.areaRectangle_ = new Rectangle();
-    }
+  cancelDraw() {
+    this.draw_.active = false;
+    this.draw_.clear();
   }
 
-  cancelDraw_() {
-    if (this.mouseDown_) {
-      this.endDrawing_();
-      return;
-    }
-    this.drawMode_ = false;
-    this.doRender_();
-    this.screenSpaceEventHandler_.removeInputAction(ScreenSpaceEventType.MOUSE_MOVE);
-    this.screenSpaceEventHandler_.removeInputAction(ScreenSpaceEventType.LEFT_DOWN);
-    this.screenSpaceEventHandler_.removeInputAction(ScreenSpaceEventType.LEFT_UP);
-  }
-
-  getAreaLocationCallback_(time, result) {
-    return Rectangle.clone(this.areaRectangle_, result);
-  }
-
-  drawArea_(movement) {
-    if (!this.mouseDown_) {
-      return;
-    }
-
-    this.cartesian_ = this.viewer_.scene.pickPosition(movement.endPosition);
-
-    if (this.cartesian_) {
-      this.tempCartographic_ = Cartographic.fromCartesian(this.cartesian_, Ellipsoid.WGS84, this.tempCartographic_);
-
-      if (!this.firstPointSet_) {
-        Cartographic.clone(this.tempCartographic_, this.firstPoint_);
-        this.firstPointSet_ = true;
-      } else {
-        this.areaRectangle_.east = Math.max(this.tempCartographic_.longitude, this.firstPoint_.longitude);
-        this.areaRectangle_.west = Math.min(this.tempCartographic_.longitude, this.firstPoint_.longitude);
-        this.areaRectangle_.north = Math.max(this.tempCartographic_.latitude, this.firstPoint_.latitude);
-        this.areaRectangle_.south = Math.min(this.tempCartographic_.latitude, this.firstPoint_.latitude);
-        this.area_.show = true;
-        this.area_.selectable = true;
+  onClick_(click) {
+    if (!this.draw_.active && this.areasClickable) {
+      const pickedObject = this.viewer.scene.pick(click.position);
+      if (pickedObject && pickedObject.id) { // to prevent error on tileset click
+        if (this.interestAreasDataSource.entities.contains(pickedObject.id)) {
+          this.pickArea_(pickedObject.id.id);
+        } else if (this.selectedArea_) {
+          updateColor(this.selectedArea_, false);
+          this.selectedArea_ = null;
+        }
       }
     }
   }
 
-  onClick_(click) {
-    const pickedObject = this.viewer_.scene.pick(click.position);
-    if (!defined(pickedObject) || !pickedObject.id) return;
-    if (this.interestAreasDataSource.entities.contains(pickedObject.id)) {
-      this.pickArea_(pickedObject.id.id);
-    } else if (this.selectedArea_) {
+  deselectArea() {
+    if (this.selectedArea_) {
       updateColor(this.selectedArea_, false);
       this.selectedArea_ = null;
-      this.doRender_();
     }
   }
 
@@ -158,11 +120,6 @@ export default class AreaOfInterestDrawer {
     }
     this.selectedArea_ = entity;
     updateColor(this.selectedArea_, true);
-  }
-
-  doRender_() {
-    const element = document.getElementById('areasOfInterest');
-    render(getTemplate.call(this), element);
   }
 
   get entitiesList_() {
@@ -190,13 +147,9 @@ export default class AreaOfInterestDrawer {
     }
   }
 
-  onAddAreaClick_() {
-    this.drawMode_ = true;
-    this.doRender_();
-
-    this.screenSpaceEventHandler_.setInputAction(this.drawArea_.bind(this), ScreenSpaceEventType.MOUSE_MOVE);
-    this.screenSpaceEventHandler_.setInputAction(this.startDrawing_.bind(this), ScreenSpaceEventType.LEFT_DOWN);
-    this.screenSpaceEventHandler_.setInputAction(this.endDrawing_.bind(this), ScreenSpaceEventType.LEFT_UP);
+  onAddAreaClick_(type) {
+    this.draw_.type = type;
+    this.draw_.active = true;
   }
 
   flyToArea_(id) {
@@ -204,7 +157,7 @@ export default class AreaOfInterestDrawer {
     if (!entity.isShowing) {
       entity.show = !entity.isShowing;
     }
-    this.viewer_.flyTo(entity);
+    this.viewer.flyTo(entity);
     this.pickArea_(id);
   }
 
@@ -218,8 +171,8 @@ export default class AreaOfInterestDrawer {
       }
       const kmlDataSource = await KmlDataSource.load(file,
         {
-          camera: this.viewer_.scene.camera,
-          canvas: this.viewer_.scene.canvas,
+          camera: this.viewer.scene.camera,
+          canvas: this.viewer.scene.canvas,
           clampToGround: true
         });
       evt.target.value = null;
@@ -237,7 +190,29 @@ export default class AreaOfInterestDrawer {
       entity.polygon.fill = true;
       entity.polygon.material = DEFAULT_AOI_COLOR;
       this.interestAreasDataSource.entities.add(entity);
-      this.viewer_.flyTo(entity);
+      this.viewer.flyTo(entity);
     }
   }
+
+  setAreasClickable(areasClickable) {
+    this.areasClickable = areasClickable;
+    if (!this.areasClickable) {
+      this.deselectArea();
+    }
+  }
+
+  render() {
+    if (!this.viewer) {
+      return '';
+    }
+
+    return getTemplate.call(this);
+  }
+
+  createRenderRoot() {
+    return this;
+  }
+
 }
+
+customElements.define('ngm-aoi-drawer', NgmAreaOfInterestDrawer);

@@ -3,8 +3,6 @@ import {SWITZERLAND_RECTANGLE} from './constants.js';
 
 import Viewer from 'cesium/Widgets/Viewer/Viewer.js';
 import RequestScheduler from 'cesium/Core/RequestScheduler.js';
-import UrlTemplateImageryProvider from 'cesium/Scene/UrlTemplateImageryProvider.js';
-import Credit from 'cesium/Core/Credit.js';
 import CesiumTerrainProvider from 'cesium/Core/CesiumTerrainProvider.js';
 import IonResource from 'cesium/Core/IonResource.js';
 import JulianDate from 'cesium/Core/JulianDate.js';
@@ -16,24 +14,25 @@ import Cartesian2 from 'cesium/Core/Cartesian2.js';
 // import GlobeTranslucencyMode from 'cesium/Scene/GlobeTranslucencyMode.js';
 // import NearFarScalar from 'cesium/Core/NearFarScalar.js';
 import NavigableVolumeLimiter from './NavigableVolumeLimiter.js';
-import ImageryLayer from 'cesium/Scene/ImageryLayer.js';
 import LimitCameraHeightToDepth from './LimitCameraHeightToDepth.js';
 import KeyboardNavigation from './KeyboardNavigation.js';
 import SurfaceColorUpdater from './SurfaceColorUpdater.js';
 import Rectangle from 'cesium/Core/Rectangle.js';
 import SingleTileImageryProvider from 'cesium/Scene/SingleTileImageryProvider.js';
+import MapChooser from './MapChooser';
+import {addSwisstopoLayer} from './swisstopoImagery.js';
 
 
 window['CESIUM_BASE_URL'] = '.';
 
 Ion.defaultAccessToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiI0YjNhNmQ4My01OTdlLTRjNmQtYTllYS1lMjM0NmYxZTU5ZmUiLCJpZCI6MTg3NTIsInNjb3BlcyI6WyJhc2wiLCJhc3IiLCJhc3ciLCJnYyJdLCJpYXQiOjE1NzQ0MTAwNzV9.Cj3sxjA_x--bN6VATcN4KE9jBJNMftlzPuA8hawuZkY';
 
-const noLimit = document.location.search.includes('noLimit');
-
 Object.assign(RequestScheduler.requestsByServer, {
   'wmts.geo.admin.ch:443': 18,
   'vectortiles0.geo.admin.ch:443': 18
 });
+
+let noLimit;
 
 /**
  * @param {HTMLElement} container
@@ -46,6 +45,22 @@ export function setupViewer(container) {
     url: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+ip1sAAAAASUVORK5CYII=',
     rectangle: Rectangle.fromDegrees(0, 0, 1, 1) // the Rectangle dimensions are arbitrary
   });
+
+  const searchParams = new URLSearchParams(location.search);
+
+  const terrainExaggeration = parseFloat(searchParams.get('terrainExaggeration') || '1');
+  noLimit = document.location.hostname === 'localhost' || searchParams.has('noLimit');
+  if (searchParams.get('noLimit') === 'false') {
+    noLimit = false;
+  }
+
+  let terrainUrl;
+  const ownTerrain = searchParams.has('ownterrain');
+  if (ownTerrain) {
+    terrainUrl = 'https://terrain.dev.bgdi.ch/1.0.0/ch.swisstopo.terrain.3d/default/0.14/4326/';
+  } else {
+    terrainUrl = IonResource.fromAssetId(1);
+  }
 
   const viewer = new Viewer(container, {
     contextOptions: {
@@ -71,14 +86,25 @@ export function setupViewer(container) {
     showRenderLoopErrors: false,
     useBrowserRecommendedResolution: true,
     terrainProvider: new CesiumTerrainProvider({
-      url: IonResource.fromAssetId(1)
+      url: terrainUrl
     }),
-    terrainExaggeration: 1,
+    terrainExaggeration: terrainExaggeration,
     requestRenderMode: true,
     // maximumRenderTimeChange: 10,
   });
 
   const scene = viewer.scene;
+  const globe = scene.globe;
+
+  if (ownTerrain) {
+    const rectangle = Rectangle.fromDegrees(
+      5.86725126512748,
+      45.8026860136571,
+      10.9209100671547,
+      47.8661652478939
+    );
+    globe.cartographicLimitRectangle = rectangle;
+  }
 
   // Position the sun the that shadows look nice
   viewer.clock.currentTime = JulianDate.fromDate(new Date('June 21, 2018 12:00:00 GMT+0200'));
@@ -93,7 +119,6 @@ export function setupViewer(container) {
 
   scene.screenSpaceCameraController.enableCollisionDetection = false;
 
-  const globe = scene.globe;
   globe.baseColor = Color.WHITE;
   globe.depthTestAgainstTerrain = true;
   globe.showGroundAtmosphere = false;
@@ -107,14 +132,7 @@ export function setupViewer(container) {
   // globe.translucencyMode = GlobeTranslucencyMode.FRONT_FACES_ONLY;
   // globe.translucencyByDistance = new NearFarScalar(1500, 0.8, 50000, 1.0);
 
-  const imageryLayer = new ImageryLayer(
-    new UrlTemplateImageryProvider({
-      url: 'https://wmts.geo.admin.ch/1.0.0/ch.swisstopo.pixelkarte-grau/default/current/3857/{z}/{x}/{y}.jpeg',
-      rectangle: SWITZERLAND_RECTANGLE,
-      credit: new Credit('swisstopo')
-    }));
-
-  scene.imageryLayers.add(imageryLayer);
+  setupBaseLayers(viewer);
 
   new SurfaceColorUpdater(scene);
 
@@ -125,8 +143,10 @@ export function setupViewer(container) {
  * @param {import('cesium/Widgets/Viewer/Viewer').default} viewer
  */
 export function addMantelEllipsoid(viewer) {
+  if (noLimit) {
+    return;
+  }
   // Add Mantel ellipsoid
-  if (noLimit) return;
   const radii = Ellipsoid.WGS84.radii.clone();
   const mantelDepth = 30000; // See https://jira.camptocamp.com/browse/GSNGM-34
   radii.x -= mantelDepth;
@@ -142,4 +162,33 @@ export function addMantelEllipsoid(viewer) {
   entity.ellipsoid.material.repeat = new Cartesian2(40, 40);
 
   new LimitCameraHeightToDepth(viewer.scene, mantelDepth);
+}
+
+function setupBaseLayers(viewer) {
+  const arealLayer = 'ch.swisstopo.swissimage';
+  const greyLayer = 'ch.swisstopo.pixelkarte-grau';
+  const detailedLayer = 'ch.swisstopo.landeskarte-grau-10';
+
+  const t = a => a;
+  const mapsConfig = [
+    {
+      id: arealLayer,
+      labelKey: t('areal_map_label'),
+      backgroundImgSrc: '../images/arealimage.png', //relative to ngm-map-chooser
+      layer: addSwisstopoLayer(viewer, arealLayer, 'jpeg', false)
+    },
+    {
+      id: greyLayer,
+      labelKey: t('grey_map_label'),
+      backgroundImgSrc: '../images/grey.png',
+      layer: addSwisstopoLayer(viewer, greyLayer, 'jpeg')
+    },
+    {
+      id: detailedLayer,
+      labelKey: t('detailed_map_label'),
+      backgroundImgSrc: '../images/detailed.png',
+      layer: addSwisstopoLayer(viewer, detailedLayer, 'png', false)
+    }];
+
+  new MapChooser(viewer, mapsConfig);
 }
