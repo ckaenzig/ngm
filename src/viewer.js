@@ -11,16 +11,15 @@ import Cartesian3 from 'cesium/Core/Cartesian3.js';
 import Color from 'cesium/Core/Color.js';
 import Ion from 'cesium/Core/Ion.js';
 import Cartesian2 from 'cesium/Core/Cartesian2.js';
-// import GlobeTranslucencyMode from 'cesium/Scene/GlobeTranslucencyMode.js';
-// import NearFarScalar from 'cesium/Core/NearFarScalar.js';
+import NearFarScalar from 'cesium/Core/NearFarScalar.js';
 import NavigableVolumeLimiter from './NavigableVolumeLimiter.js';
 import LimitCameraHeightToDepth from './LimitCameraHeightToDepth.js';
 import KeyboardNavigation from './KeyboardNavigation.js';
-import SurfaceColorUpdater from './SurfaceColorUpdater.js';
 import Rectangle from 'cesium/Core/Rectangle.js';
 import SingleTileImageryProvider from 'cesium/Scene/SingleTileImageryProvider.js';
 import MapChooser from './MapChooser';
 import {addSwisstopoLayer} from './swisstopoImagery.js';
+import ScreenSpaceEventType from 'cesium/Core/ScreenSpaceEventType.js';
 
 
 window['CESIUM_BASE_URL'] = '.';
@@ -93,6 +92,9 @@ export function setupViewer(container) {
     // maximumRenderTimeChange: 10,
   });
 
+  // remove the default behaviour of calling 'zoomTo' on the double clicked entity
+  viewer.screenSpaceEventHandler.removeInputAction(ScreenSpaceEventType.LEFT_DOUBLE_CLICK);
+
   const scene = viewer.scene;
   const globe = scene.globe;
 
@@ -118,6 +120,8 @@ export function setupViewer(container) {
   new KeyboardNavigation(viewer.scene);
 
   scene.screenSpaceCameraController.enableCollisionDetection = false;
+  scene.useDepthPicking = true;
+  scene.pickTranslucentDepth = true;
 
   globe.baseColor = Color.WHITE;
   globe.depthTestAgainstTerrain = true;
@@ -125,16 +129,19 @@ export function setupViewer(container) {
   globe.showWaterEffect = false;
   globe.backFaceCulling = false;
 
-  // Set the globe translucency to 0.8 when the
-  // camera is 1500 meters from the surface and 1.0
+  // Set the globe translucency to 0.6 when the
+  // camera is 10000 meters from the surface and 1.0
   // as the camera distance approaches 50000 meters.
-  // FIXME: deactivated because it broke the drawing tools
-  // globe.translucencyMode = GlobeTranslucencyMode.FRONT_FACES_ONLY;
-  // globe.translucencyByDistance = new NearFarScalar(1500, 0.8, 50000, 1.0);
+  globe.translucencyEnabled = true;
+  globe.frontFaceAlphaByDistance = new NearFarScalar(10000, 0.6, 50000, 1.0);
+  globe.undergroundColorByDistance = new NearFarScalar(6000, 0.1, 500000, 1.0);
+  globe.backFaceAlpha = 1.0;
+
+  scene.postRender.addEventListener((scene) => {
+    scene.skyAtmosphere.show = !scene.cameraUnderground;
+  });
 
   setupBaseLayers(viewer);
-
-  new SurfaceColorUpdater(scene);
 
   return viewer;
 }
