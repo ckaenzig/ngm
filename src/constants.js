@@ -39,6 +39,7 @@ export const LAYERS_VISIBILITY_URL_PARAM = 'layers_visibility';
 export const LAYERS_OPACITY_URL_PARAM = 'layers_opacity';
 export const ASSET_IDS_URL_PARAM = 'assetIds';
 export const MAP_URL_PARAM = 'map';
+export const MAP_TRANSPARENCY_URL_PARAM = 'map_transparency';
 
 export const BILLBOARDS_PREFIX = 'billboards_';
 
@@ -162,17 +163,13 @@ const geo_base = {
       children: [
         {
           type: LAYER_TYPES.tiles3d,
-          assetId: 68857,
+          assetId: 96289,
           label: t('boreholes_label'),
           layer: 'boreholes',
           opacity: DEFAULT_LAYER_OPACITY,
           pickable: true,
           visible: true,
           displayed: true,
-          billboards: {
-            lonPropName: 'Longitude',
-            latPropName: 'Latitude'
-          }
         }, {
           type: LAYER_TYPES.tiles3d,
           assetId: 68881,

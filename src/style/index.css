@@ -20,6 +20,7 @@
 @import 'fomantic-ui-css/components/grid.css';
 @import 'fomantic-ui-css/components/modal.css';
 @import 'fomantic-ui-css/components/form.css';
+@import 'fomantic-ui-css/components/slider.css';
 
 @import 'cesium/Build/Cesium/Widgets/widgets.css';
 
@@ -29,7 +30,8 @@
 @import 'area-of-interest.css';
 @import 'keyboard-navigation.css';
 @import 'layers.css';
-@import 'slider.css';
+@import 'map-configuration.css';
+@import 'review-window.css';
 
 [hidden] {
   display: none !important;
@@ -56,11 +58,10 @@ a {
   text-decoration: none;
 }
 
-header {
-  display: flex;
-}
 
 header {
+  display: flex;
+  flex-shrink: 0;
   padding: 10px;
   border-bottom: 1px solid rgba(0, 0, 0, 0.1);
 
@@ -152,10 +153,15 @@ main {
   margin: 6px;
 }
 
-.navigation-widgets, ngm-navigation-widgets {
+.navigation-widgets, ngm-navigation-widgets, .ngm-navigation-buttons {
   display: flex;
   flex-direction: column;
   align-items: center;
+}
+
+ngm-navigation-widgets {
+  align-items: flex-end;
+  width: 0;
 }
 
 .navigation-widgets .ui.button, ngm-elevator-buttons{
@@ -172,13 +178,6 @@ cesium-compass {
 cesium-view-cube {
   --cesium-view-cube-stroke-color: rgba(0, 0, 0, 0.6);
   --cesium-view-cube-fill-color: rgba(224, 225, 226, 0.8);
-}
-
-ngm-map-chooser {
-  bottom: 30px;
-  right: 10px;
-  position: absolute;
-  z-index: 10;
 }
 
 .sidebar {
@@ -247,4 +246,13 @@ body:after { /* Beta label */
 
 .no-pointer-events {
   pointer-events: none;
+}
+
+#divinspector {
+  position:absolute;
+  z-index:10;
+}
+
+ngm-gst-interaction > .ui.tiny.icon.buttons {
+  display: flex;
 }
