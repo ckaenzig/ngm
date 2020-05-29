@@ -33,10 +33,11 @@ export const DEFAULT_VIEW = (function() {
 
 export const SUPPORTED_LANGUAGES = ['de', 'fr', 'it', 'en'];
 export const DRILL_PICK_LIMIT = 1;
+export const DRILL_PICK_LENGTH = 1;
 
 export const LAYERS_URL_PARAM = 'layers';
 export const LAYERS_VISIBILITY_URL_PARAM = 'layers_visibility';
-export const LAYERS_OPACITY_URL_PARAM = 'layers_opacity';
+export const LAYERS_TRANSPARENCY_URL_PARAM = 'layers_transparency';
 export const ASSET_IDS_URL_PARAM = 'assetIds';
 export const MAP_URL_PARAM = 'map';
 export const MAP_TRANSPARENCY_URL_PARAM = 'map_transparency';
@@ -108,7 +109,7 @@ export const LAYER_TYPES = {
   earthquakes: 'earthquakes',
 };
 
-export const DEFAULT_LAYER_OPACITY = 0.7;
+export const DEFAULT_LAYER_TRANSPARENCY = 0;
 
 export const AOI_DATASOURCE_NAME = 'interestAreas';
 
@@ -135,21 +136,21 @@ const geo_map_series = {
           layer: 'ch.swisstopo.geologie-geocover',
           visible: true,
           displayed: true,
-          opacity: DEFAULT_LAYER_OPACITY,
+          transparency: 0.3,
         // }, {
         //   type: LAYER_TYPES.swisstopoWMTS,
         //   label: t('ch.swisstopo.pixelkarte-farbe'),
         //   layer: 'ch.swisstopo.pixelkarte-farbe',
         //   visible: true,
         //   displayed: true,
-        //   opacity: DEFAULT_LAYER_OPACITY,
+        //   transparency DEFAULT_LAYER_OPACITY,
         // }, {
         //   type: LAYER_TYPES.swisstopoWMTS,
         //   label: t('ch.swisstopo.swisstlm3d-wanderwege'),
         //   layer: 'ch.swisstopo.swisstlm3d-wanderwege',
         //   visible: true,
         //   displayed: true,
-        //   opacity: DEFAULT_LAYER_OPACITY,
+        //   transparency DEFAULT_LAYER_OPACITY,
         },
       ]
     },
@@ -163,10 +164,10 @@ const geo_base = {
       children: [
         {
           type: LAYER_TYPES.tiles3d,
-          assetId: 96289,
+          assetId: 105125,
           label: t('boreholes_label'),
           layer: 'boreholes',
-          opacity: DEFAULT_LAYER_OPACITY,
+          transparency: DEFAULT_LAYER_TRANSPARENCY,
           pickable: true,
           visible: true,
           displayed: true,
@@ -175,7 +176,7 @@ const geo_base = {
           assetId: 68881,
           label: t('cross_section_label'),
           layer: 'cross_section',
-          opacity: DEFAULT_LAYER_OPACITY,
+          transparency: DEFAULT_LAYER_TRANSPARENCY,
           visible: true,
           displayed: true,
           pickable: true
@@ -197,7 +198,7 @@ const geo_energy = {
           assetId: 69922,
           label: t('temperature_model_label'),
           layer: 'temperature_model',
-          opacityDisabled: true
+          transparencyDisabled: true
         }
       ]
     },
@@ -213,7 +214,7 @@ const natural_hazard = {
       layer: 'earthquakes',
       visible: true,
       displayed: true,
-      opacity: DEFAULT_LAYER_OPACITY
+      transparency: DEFAULT_LAYER_TRANSPARENCY
     },
   ]
 };
@@ -229,7 +230,7 @@ const subsurface = {
           assetId: 76814,
           label: t('top_bedrock_label'),
           layer: 'top_bedrock',
-          opacity: DEFAULT_LAYER_OPACITY,
+          transparency: DEFAULT_LAYER_TRANSPARENCY,
           pickable: true
         },
         {
@@ -237,7 +238,7 @@ const subsurface = {
           assetId: 76931,
           label: t('top_lower_freshwater_molasse_label'),
           layer: 'top_lower_freshwater_molasse',
-          opacity: DEFAULT_LAYER_OPACITY,
+          transparency: DEFAULT_LAYER_TRANSPARENCY,
           pickable: true
         },
         {
@@ -245,7 +246,7 @@ const subsurface = {
           assetId: 76815,
           label: t('base_cenozoic_label'),
           layer: 'base_cenozoic',
-          opacity: DEFAULT_LAYER_OPACITY,
+          transparency: DEFAULT_LAYER_TRANSPARENCY,
           pickable: true
         },
         {
@@ -253,7 +254,7 @@ const subsurface = {
           assetId: 76817,
           label: t('top_dogger_label'),
           layer: 'top_dogger',
-          opacity: DEFAULT_LAYER_OPACITY,
+          transparency: DEFAULT_LAYER_TRANSPARENCY,
           pickable: true
         },
         {
@@ -261,7 +262,7 @@ const subsurface = {
           assetId: 76816,
           label: t('base_mesozoic_label'),
           layer: 'base_mesozoic',
-          opacity: DEFAULT_LAYER_OPACITY,
+          transparency: DEFAULT_LAYER_TRANSPARENCY,
           pickable: true
         },
       ]
@@ -278,7 +279,7 @@ const man_made_objects = {
       label: t('tunnel_label'),
       layer: 'tunnel',
       pickable: true,
-      opacityDisabled: true
+      transparencyDisabled: true
     },
   ]
 };
@@ -292,7 +293,7 @@ const background = {
       label: t('swissnames_label'),
       style: SWISSTOPO_LABEL_STYLE,
       layer: 'ch.swisstopo.swissnames3d.3d',
-      opacity: DEFAULT_LAYER_OPACITY
+      transparencyDisabled: true // opacity not work with color conditions
     },
     man_made_objects,
   ]

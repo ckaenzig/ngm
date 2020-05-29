@@ -1,7 +1,13 @@
 // @ts-check
 import {initSentry} from './sentry.js';
 import {setupI18n} from './i18n.js';
-import {DEFAULT_VIEW, DRILL_PICK_LIMIT, SWITZERLAND_RECTANGLE} from './constants.js';
+import {
+  DEFAULT_VIEW,
+  DRILL_PICK_LIMIT,
+  SWITZERLAND_RECTANGLE,
+  DRILL_PICK_LENGTH,
+  AOI_DATASOURCE_NAME
+} from './constants.js';
 
 import './style/index.css';
 import {setupSearch} from './search.js';
@@ -26,6 +32,7 @@ import './elements/ngm-feature-height.js';
 import './elements/ngm-left-side-bar.js';
 import './elements/ngm-map-configuration.js';
 import './elements/ngm-review-window.js';
+import './elements/ngm-position-edit.js';
 import {LocalStorageController} from './LocalStorageController.js';
 
 initSentry();
@@ -130,8 +137,8 @@ objectInfo.addEventListener('closed', () => {
 
 viewer.screenSpaceEventHandler.setInputAction(click => {
   silhouette.selected = [];
-
-  const objects = viewer.scene.drillPick(click.position, DRILL_PICK_LIMIT);
+  const objects = viewer.scene.drillPick(click.position, DRILL_PICK_LIMIT, DRILL_PICK_LENGTH, DRILL_PICK_LENGTH);
+  const pickedPosition = viewer.scene.pickPosition(click.position);
   let attributes = null;
 
   if (objects.length > 0) {
@@ -139,18 +146,31 @@ viewer.screenSpaceEventHandler.setInputAction(click => {
     if (!isPickable(object)) {
       return;
     }
+
     if (object.getPropertyNames) {
       attributes = extractPrimitiveAttributes(object);
-      // attributes.zoom = () => console.log('should zoom to', objects[0]);
+      attributes.zoom = () => {
+        const boundingSphere = new BoundingSphere(pickedPosition, 1000);
+        const zoomHeadingPitchRange = new HeadingPitchRange(0, Math.PI / 8, 3 * boundingSphere.radius);
+        viewer.scene.camera.flyToBoundingSphere(boundingSphere, {
+          duration: 0,
+          offset: zoomHeadingPitchRange
+        });
+      };
       silhouette.selected = [object];
     } else if (object.id && object.id.properties) {
       const props = extractEntitiesAttributes(object.id);
       attributes = {...props};
-      attributes.zoom = () => viewer.zoomTo(object.id, props.zoomHeadingPitchRange);
-      if (attributes.zoomHeadingPitchRange) {
+      const aoiDataSource = viewer.dataSources.getByName(AOI_DATASOURCE_NAME)[0];
+      if (aoiDataSource.entities.contains(object.id)) {
+        attributes = {...attributes, name: object.id.name};
+        attributes = document.querySelector('ngm-aoi-drawer').getInfoProps(attributes);
+      } else if (attributes.zoomHeadingPitchRange) {
         // Don't show the value in the object info window
         delete attributes.zoomHeadingPitchRange;
       }
+      attributes.zoom = () => viewer.zoomTo(object.id, props.zoomHeadingPitchRange);
+
       silhouette.selected = [object];
     }
   }
@@ -174,7 +194,6 @@ viewer.camera.moveEnd.addEventListener(() => syncCamera(viewer.camera));
 const widgets = document.querySelector('ngm-navigation-widgets');
 widgets.viewer = viewer;
 
-document.querySelector('ngm-camera-information').scene = viewer.scene;
 document.querySelector('ngm-feature-height').viewer = viewer;
 document.querySelector('ngm-map-configuration').viewer = viewer;
 

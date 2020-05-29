@@ -10,10 +10,25 @@ export function degreesToLv95(coordinates) {
   return proj4('EPSG:4326', 'EPSG:2056', coordinates.slice());
 }
 
+export function lv95ToDegrees(coordinates) {
+  return proj4('EPSG:2056', 'EPSG:4326', coordinates);
+}
+
 /**
  * @param {Array<number>} coordinates
  * @return {Array<number>}
  */
 export function round(coordinates) {
   return coordinates.map(Math.round);
+}
+
+const swissIntegerFormat = new Intl.NumberFormat('de-CH', {
+  maximumFractionDigits: 0
+});
+
+export function formatCartographicAs2DLv95(carto) {
+  return proj4('EPSG:4326', 'EPSG:2056', [
+    carto.longitude * 180 / Math.PI,
+    carto.latitude * 180 / Math.PI,
+  ]).map(Math.round).map(swissIntegerFormat.format).join(', ');
 }
