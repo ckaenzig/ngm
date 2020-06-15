@@ -52,7 +52,7 @@ class NgmNavigationWidgets extends I18nMixin(LitElement) {
           ></cesium-compass>
           <ngm-zoom-buttons .scene="${this.viewer.scene}"></ngm-zoom-buttons>
           <ngm-elevator-buttons .scene="${this.viewer.scene}"></ngm-elevator-buttons>
-          <ngm-nadir-view .scene="${this.viewer.scene}"></ngm-nadir-view>
+          <!-- <ngm-nadir-view .scene="${this.viewer.scene}"></ngm-nadir-view> -->
           <ngm-keyboard-info-popup></ngm-keyboard-info-popup>
         </div>
       `;
