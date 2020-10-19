@@ -1,9 +1,7 @@
 import ScreenSpaceEventType from 'cesium/Source/Core/ScreenSpaceEventType';
 import Cartesian3 from 'cesium/Source/Core/Cartesian3';
-import Cartographic from 'cesium/Source/Core/Cartographic';
 import CustomDataSource from 'cesium/Source/DataSources/CustomDataSource';
 import KmlDataSource from 'cesium/Source/DataSources/KmlDataSource';
-import Entity from 'cesium/Source/DataSources/Entity';
 import getTemplate from './areaOfInterestTemplate.js';
 import i18next from 'i18next';
 import {getMeasurements} from '../utils.js';
@@ -12,12 +10,11 @@ import {LitElement} from 'lit-element';
 
 import {
   AOI_DATASOURCE_NAME,
-  CESIUM_NOT_GRAPHICS_ENTITY_PROPS,
   DEFAULT_AOI_COLOR,
   HIGHLIGHTED_AOI_COLOR,
   DEFAULT_VOLUME_HEIGHT_LIMITS
 } from '../constants.js';
-import {updateColor} from './helpers.js';
+import {updateColor, cleanupUploadedEntity, getUploadedAreaType} from './helpers.js';
 import {showWarning} from '../message.js';
 import {I18nMixin} from '../i18n';
 import {CesiumDraw} from '../draw/CesiumDraw.js';
@@ -25,7 +22,7 @@ import ScreenSpaceEventHandler from 'cesium/Source/Core/ScreenSpaceEventHandler'
 import BoundingSphere from 'cesium/Source/Core/BoundingSphere';
 import HeadingPitchRange from 'cesium/Source/Core/HeadingPitchRange';
 import NearFarScalar from 'cesium/Source/Core/NearFarScalar';
-import {applyInputLimits, convertCartographicToScreenCoordinates, updateHeightForCartesianPositions} from '../utils';
+import {applyInputLimits, updateHeightForCartesianPositions} from '../utils';
 import Cartesian2 from 'cesium/Source/Core/Cartesian2';
 import CornerType from 'cesium/Source/Core/CornerType';
 import {showMessage} from '../message';
@@ -35,14 +32,12 @@ class NgmAreaOfInterestDrawer extends I18nMixin(LitElement) {
   static get properties() {
     return {
       viewer: {type: Object},
-      selectedArea_: {type: Object},
-      positionEditPopup: {type: Object}
+      selectedArea_: {type: Object}
     };
   }
 
   constructor() {
     super();
-    this.onPositionChangedFunction = this.onPositionChanged.bind(this);
     this.minVolumeHeight = 1;
     this.maxVolumeHeight = 30000;
     this.minVolumeLowerLimit = -30000;
@@ -85,22 +80,18 @@ class NgmAreaOfInterestDrawer extends I18nMixin(LitElement) {
     this.draw_.addEventListener('statechanged', () => this.requestUpdate());
     this.draw_.addEventListener('drawerror', evt => {
       if (this.draw_.ERROR_TYPES.needMorePoints === evt.detail.error) {
-        showWarning(i18next.t('error_need_more_points'));
+        showWarning(i18next.t('tbx_error_need_more_points_warning'));
       }
     });
     this.draw_.addEventListener('leftdown', () => {
       const volumeShowedProp = this.draw_.entityForEdit.properties.volumeShowed;
-      if (this.draw_.type === 'point') {
-        this.positionEditPopup.opened = false;
-      } else if (volumeShowedProp && volumeShowedProp.getValue()) {
+      if (volumeShowedProp && volumeShowedProp.getValue()) {
         this.draw_.entityForEdit.polylineVolume.show = false; // to avoid jumping when mouse over entity
       }
     });
     this.draw_.addEventListener('leftup', () => {
       const volumeShowedProp = this.draw_.entityForEdit.properties.volumeShowed;
-      if (this.draw_.type === 'point') {
-        this.positionEditPopup.opened = true;
-      } else if (volumeShowedProp && volumeShowedProp.getValue()) {
+      if (volumeShowedProp && volumeShowedProp.getValue()) {
         this.updateEntityVolume(this.draw_.entityForEdit.id);
       }
     });
@@ -157,11 +148,8 @@ class NgmAreaOfInterestDrawer extends I18nMixin(LitElement) {
       }
     }
     this.editedBackup = undefined;
-    this.positionEditPopup.position = undefined;
-    this.positionEditPopup.removeEventListener('positionChanged', this.onPositionChangedFunction);
     this.draw_.active = false;
     this.draw_.clear();
-    this.positionEditPopup.opened = false;
     if (this.unlistenEditPostRender) {
       this.unlistenEditPostRender();
     }
@@ -268,7 +256,7 @@ class NgmAreaOfInterestDrawer extends I18nMixin(LitElement) {
     const file = evt.target ? evt.target.files[0] : null;
     if (file) {
       if (!file.name.toLowerCase().includes('.kml')) {
-        showWarning(i18next.t('unsupported_file_warning'));
+        showWarning(i18next.t('tbx_unsupported_file_warning'));
         evt.target.value = null;
         return;
       }
@@ -280,21 +268,44 @@ class NgmAreaOfInterestDrawer extends I18nMixin(LitElement) {
         });
       evt.target.value = null;
 
-      const entity = new Entity();
-      kmlDataSource.entities.values.forEach(ent => entity.merge(ent));
-
-      const notOnlyPolygon = entity.propertyNames.some(prop => !CESIUM_NOT_GRAPHICS_ENTITY_PROPS.includes(prop) && !!entity[prop]);
-
-      if (notOnlyPolygon) {
-        showWarning(i18next.t('unsupported_kml_warning'));
-        return;
+      let entities = kmlDataSource.entities.values;
+      if (entities.length > 10) {
+        showWarning(i18next.t('tbx_kml_large_warning'));
+        entities = entities.slice(0, 10);
       }
+      let atLeastOneValid = false;
+      entities.forEach((ent, index) => {
+        const exists = this.interestAreasDataSource.entities.getById(ent.id);
+        if (!exists) {
+          const type = getUploadedAreaType(ent);
+          if (type) {
+            atLeastOneValid = true;
+            ent = cleanupUploadedEntity(ent);
+            if (type === 'point') {
+              ent.point = {
+                pixelSize: 8,
+                scaleByDistance: new NearFarScalar(0, 1, 1, 1)
+              };
+            }
+            ent.name = ent.name ? `${ent.name}` : `${kmlDataSource.name}`;
+            ent.properties = this.getAreaProperties(ent, type);
+            if (ent.polygon) {
+              ent.polygon.fill = true;
+            }
+            updateColor(ent, false);
+            this.interestAreasDataSource.entities.add(ent);
+          }
+        } else {
+          atLeastOneValid = true;
+          showWarning(i18next.t('tbx_kml_area_existing_warning'));
+        }
+      });
 
-      entity.properties = this.getAreaProperties(entity, 'polygon');
-      entity.polygon.fill = true;
-      entity.polygon.material = DEFAULT_AOI_COLOR;
-      this.interestAreasDataSource.entities.add(entity);
-      this.flyToArea(entity.id);
+      if (!atLeastOneValid) {
+        showWarning(i18next.t('tbx_unsupported_kml_warning'));
+      } else {
+        this.viewer.zoomTo(entities);
+      }
     }
   }
 
@@ -337,15 +348,15 @@ class NgmAreaOfInterestDrawer extends I18nMixin(LitElement) {
 
   getInfoProps(props) {
     const attributes = {
-      [i18next.t('nameLabel')]: props.name,
+      [i18next.t('obj_info_name_label')]: props.name,
       zoom: () => this.flyToArea(props.id)
     };
     if (props.type === 'rectangle' || props.type === 'polygon') {
-      attributes[i18next.t('Area')] = `${props.area}km²`;
-      attributes[i18next.t('Perimeter')] = `${props.perimeter}km`;
-      attributes[i18next.t('numberOfSegments')] = props.numberOfSegments;
+      attributes[i18next.t('obj_info_area_label')] = `${props.area}km²`;
+      attributes[i18next.t('obj_info_perimeter_label')] = `${props.perimeter}km`;
+      attributes[i18next.t('obj_info_number_segments_label')] = props.obj_info_number_segments_label;
     } else if (props.type === 'line') {
-      attributes[i18next.t('Length')] = `${props.perimeter}km`;
+      attributes[i18next.t('obj_info_length_label')] = `${props.perimeter}km`;
     }
     return attributes;
   }
@@ -466,29 +477,10 @@ class NgmAreaOfInterestDrawer extends I18nMixin(LitElement) {
     if (type === 'point') {
       const position = entity.position.getValue(new Date());
       this.editedBackup.positions = Cartesian3.clone(position);
-      this.positionEditPopup.opened = true;
-      this.moveEditPositionPopup(position);
-      this.positionEditPopup.addEventListener('positionChanged', this.onPositionChangedFunction);
-      this.unlistenEditPostRender = this.viewer.scene.postRender.addEventListener(() => {
-        if (this.draw_.entityForEdit) {
-          this.moveEditPositionPopup(this.draw_.entityForEdit.position.getValue(new Date()));
-        }
-      });
     } else if (type === 'line') {
       this.editedBackup.positions = entity.polyline.positions.getValue();
     } else {
       this.editedBackup.positions = entity.polygon.hierarchy.getValue();
-    }
-  }
-
-  moveEditPositionPopup(position) {
-    const cartographicPosition = Cartographic.fromCartesian(position);
-    this.positionEditPopup.position = cartographicPosition;
-    const postion2d = convertCartographicToScreenCoordinates(this.viewer.scene, cartographicPosition);
-    const popupWidth = this.positionEditPopup.clientWidth;
-    if (postion2d) {
-      this.positionEditPopup.style.left = `${postion2d.x + popupWidth / 3 - 10}px`;
-      this.positionEditPopup.style.top = `${postion2d.y}px`;
     }
   }
 
@@ -500,19 +492,19 @@ class NgmAreaOfInterestDrawer extends I18nMixin(LitElement) {
   }
 
   disableToolButtons() {
-    this.querySelectorAll('.ngm-aoi-areas .buttons button').forEach(button => button.classList.add('disabled'));
+    this.querySelectorAll('.ngm-aoi-areas .ngm-aoi-content button').forEach(button => button.classList.add('disabled'));
   }
 
   enableToolButtons() {
-    this.querySelectorAll('.ngm-aoi-areas .buttons button').forEach(button => button.classList.remove('disabled'));
+    this.querySelectorAll('.ngm-aoi-areas .ngm-aoi-content button').forEach(button => button.classList.remove('disabled'));
   }
 
-  onPositionChanged(event) {
-    this.draw_.entityForEdit.position = event.detail.position;
-    this.viewer.scene.requestRender();
-    this.moveEditPositionPopup(event.detail.position);
-  }
-
+  /**
+   * Returns properties for area of interes according to area type
+   * @param entity
+   * @param {'point' | 'line' | 'rectangle' | 'polygon'} type
+   * @return {{area: any, numberOfSegments: number, perimeter: any, sidesLength: any}|{type: *}}
+   */
   getAreaProperties(entity, type) {
     if (type === 'point') {
       return {
@@ -575,7 +567,7 @@ class NgmAreaOfInterestDrawer extends I18nMixin(LitElement) {
     entity.polylineVolume.show = true;
 
     if (showHint) {
-      showMessage(i18next.t('volume_hint_text'));
+      showMessage(i18next.t('tbx_volume_hint'));
     }
   }
 
@@ -598,13 +590,13 @@ class NgmAreaOfInterestDrawer extends I18nMixin(LitElement) {
     return entity.properties.volumeHeightLimits.getValue();
   }
 
-  onVolumeHeightLimitsChange() {
+  onVolumeHeightLimitsChange(index) {
     if (!this.draw_.entityForEdit) {
       return;
     }
     const entity = this.draw_.entityForEdit;
-    const limitInput = this.querySelector('.ngm-lower-limit-input');
-    const heightInput = this.querySelector('.ngm-volume-height-input');
+    const limitInput = this.querySelector(`.ngm-lower-limit-input-${index}`);
+    const heightInput = this.querySelector(`.ngm-volume-height-input-${index}`);
     const lowerLimit = applyInputLimits(limitInput, this.minVolumeLowerLimit, this.maxVolumeLowerLimit);
     const height = applyInputLimits(heightInput, this.minVolumeHeight, this.maxVolumeHeight);
     entity.properties.volumeHeightLimits = {lowerLimit, height};
