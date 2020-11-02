@@ -80,6 +80,14 @@ export class LayerTreeItem extends I18nMixin(LitElement) {
           @click=${() => this.dispatchEvent(new CustomEvent('moveLayer', {detail: +1}))}>
             <i class="angle up icon"></i>
         </button>
+        ${this.config.downloadUrl ?
+        html`<button class="ui button"
+          data-tooltip=${i18next.t('dtd_download_hint')}
+          data-position="top left"
+          data-variation="mini"
+          @click=${() => window.open(this.config.downloadUrl)}>
+            <i class="download icon"></i>
+        </button>` : ''}
         <button class="ui button"
           data-tooltip=${i18next.t('tbx_remove_btn_hint')}
           data-position="top right"
@@ -98,7 +106,9 @@ export class LayerTreeItem extends I18nMixin(LitElement) {
           <input class="ngm-layer-checkbox" type="checkbox"
             .checked=${this.config.visible}
             @change=${this.changeVisibility}>
-          <label @click=${this.onLabelClicked}>${i18next.t(this.config.label)}</label>
+          <label @click=${this.onLabelClicked}>
+            <i class=${this.config.restricted ? 'lock icon' : ''}></i>${i18next.t(this.config.label)}
+          </label>
         </div>
         ${this.buttons}
       </div>

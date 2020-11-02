@@ -45,15 +45,21 @@ class NgmAuth extends I18nMixin(LitElement) {
 
     // wait for the user to be authenticated
     await Auth.waitForAuthenticate();
+    Auth.initialize();
     this.user = Auth.getUser();
+    console.assert(this.user);
 
     // close the authentication popup
     popup.close();
+
+    this.dispatchEvent(new CustomEvent('refresh', {detail: {authenticated: true}}));
   }
 
   logout() {
-    Auth.removeUser();
-    this.user = Auth.getUser();
+    Auth.logout();
+    this.user = null;
+
+    this.dispatchEvent(new CustomEvent('refresh', {detail: {authenticated: false}}));
   }
 
   render() {
