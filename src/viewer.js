@@ -22,8 +22,6 @@ import PostProcessStage from 'cesium/Source/Scene/PostProcessStage';
 import Cartesian4 from 'cesium/Source/Core/Cartesian4';
 import CesiumInspector from 'cesium/Source/Widgets/CesiumInspector/CesiumInspector';
 import {getMapTransparencyParam} from './permalink.js';
-import Entity from 'cesium/Source/DataSources/Entity';
-import HeightReference from 'cesium/Source/Scene/HeightReference';
 import CameraEventType from 'cesium/Source/Scene/CameraEventType';
 import KeyboardEventModifier from 'cesium/Source/Core/KeyboardEventModifier';
 import Transforms from 'cesium/Source/Core/Transforms';
@@ -95,11 +93,19 @@ export function setupViewer(container) {
   }
 
   let terrainUrl;
-  const ownTerrain = searchParams.get('ownterrain') !== 'false';
-  if (ownTerrain) {
-    terrainUrl = 'https://3d.geo.admin.ch/1.0.0/ch.swisstopo.terrain.3d/default/20200520/4326/';
-  } else {
-    terrainUrl = IonResource.fromAssetId(1);
+  const ownTerrain = searchParams.get('ownterrain');
+  switch (ownTerrain) {
+    case 'false':
+      terrainUrl = IonResource.fromAssetId(1);
+      break;
+    case 'cli_2m':
+      terrainUrl = 'https://s3-eu-west-1.amazonaws.com/ngmpub-download-bgdi-ch/cli_terrain/ch-2m/';
+      break;
+    case 'cli_ticino_0.5m':
+      terrainUrl = 'https://s3-eu-west-1.amazonaws.com/ngmpub-download-bgdi-ch/cli_terrain/ticino-0.5m/';
+      break;
+    default:
+      terrainUrl = 'https://3d.geo.admin.ch/1.0.0/ch.swisstopo.terrain.3d/default/20200520/4326/';
   }
 
   const requestRenderMode = !searchParams.has('norequestrendermode');
@@ -187,28 +193,22 @@ export function setupViewer(container) {
     },
     name: 'fog'
   });
-  const fogShield = new Entity({
-    rectangle: {
-      material: Color.WHITE,
-      coordinates: scene.globe.cartographicLimitRectangle,
-      heightReference: HeightReference.RELATIVE_TO_GROUND,
-      height: 5000
-    },
-    name: 'fogShield'
-  });
-  viewer.entities.add(fogShield); // hack to avoid black terrain/tilesets when transparency applied
 
   viewer.scene.postProcessStages.add(fog);
-  scene.postRender.addEventListener((scene) => {
+  scene.postRender.addEventListener(scene => {
     fog.enabled = scene.cameraUnderground;
-    fogShield.show = scene.cameraUnderground;
   });
 
-  if (searchParams.has('inspector')) {
+  const enableWireframe = searchParams.has('inspector_wireframe');
+  if (searchParams.has('inspector') || enableWireframe) {
     const div = document.createElement('div');
     div.id = 'divinspector';
     document.body.appendChild(div);
-    new CesiumInspector('divinspector', scene);
+    const inspector = new CesiumInspector('divinspector', scene);
+    window['cesiumInspector'] = inspector;
+    if (enableWireframe) {
+      inspector.viewModel.wireframe = true;
+    }
   }
   return viewer;
 }

@@ -2,6 +2,7 @@ import Rectangle from 'cesium/Source/Core/Rectangle';
 import Color from 'cesium/Source/Core/Color';
 import Cartesian3 from 'cesium/Source/Core/Cartesian3';
 import CMath from 'cesium/Source/Core/Math';
+
 export {LAYER_TYPES, DEFAULT_LAYER_TRANSPARENCY} from './layertree.js';
 
 export const SWITZERLAND_BOUNDS = [5.140242, 45.398181, 11.47757, 48.230651];
@@ -32,6 +33,7 @@ export const ATTRIBUTE_VALUE_PARAM = 'attribute_value';
 export const ZOOM_TO_PARAM = 'zoom_to';
 
 export const DEFAULT_AOI_COLOR = Color.BLACK.withAlpha(0.3);
+export const DEFAULT_AOI_VOLUME_COLOR = Color.GREY.withAlpha(0.3);
 export const HIGHLIGHTED_AOI_COLOR = Color.YELLOW.withAlpha(0.3);
 
 // list of not graphics entity.propertyNames
@@ -60,3 +62,12 @@ export const AOI_POINT_COLORS = [
 ];
 
 export const AOI_POINT_SYMBOLS = ['marker-icon-white.png', 'triangle-icon-white.png'];
+
+export const SLICE_ARROW_ICONS = [
+  {type: 'vertical', uri: './images/arrowV.glb'},
+  {type: 'vertical-northeast', uri: './images/arrowV.glb'},
+  {type: 'horizontal', uri: './images/arrowH.glb'},
+  {type: 'horizontal-northeast', uri: './images/arrowH.glb'},
+  {type: 'altitude-down', uri: './images/arrowA.glb'},
+  {type: 'altitude-up', uri: './images/arrowA.glb'}
+];

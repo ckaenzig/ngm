@@ -24,6 +24,7 @@
 @import 'fomantic-ui-css/components/dropdown.css';
 @import 'fomantic-ui-css/components/label.css';
 @import 'fomantic-ui-css/components/progress.css';
+@import 'fomantic-ui-css/components/header.css';
 
 @import 'cesium/Build/Cesium/Widgets/widgets.css';
 
@@ -200,18 +201,6 @@ cesium-view-cube {
   cursor: pointer;
 }
 
-.ui.icon.buttons .button > .icon.svg-icon {
-  opacity: 0.6;
-}
-
-.ui.icon.buttons .button:hover > .icon.svg-icon {
-  opacity: 0.8;
-}
-
-.ui.icon.buttons .grey.button > .icon.svg-icon, .ui.icon.buttons .grey.button:hover > .icon.svg-icon {
-  opacity: 0.9;
-}
-
 .ui.buttons .button > .icon.horizontal-layer:before {
   content: svg-load('../images/horizontal-layer.svg', fill=#000);
 }
@@ -246,7 +235,7 @@ body:after { /* Beta label */
   justify-content: space-between;
 }
 
-.ngm-header-links > a {
+.ngm-header-links a {
   color: #ff0000;
 }
 
@@ -260,7 +249,6 @@ body:after { /* Beta label */
 }
 
 ngm-auth > a {
-  color: #ff0000;
   cursor: pointer;
 }
 
@@ -313,11 +301,6 @@ ngm-review-window a {
   color: #ff0000;
 }
 
-h4.ui.horizontal.divider.ngm-background-divider {
-  font-weight: normal;
-  text-transform: none;
-}
-
 ngm-full-screen-view {
   position: absolute;
   right: 37px;
@@ -332,4 +315,18 @@ ngm-full-screen-view.full-active {
 
 ngm-loading-mask .progress {
   width: 18%;
+}
+
+ngm-slicer {
+  display: flex;
+  flex-direction: column;
+}
+
+.layerloader {
+  line-height: 1rem;
+}
+
+.small_load_counter {
+  font-size: 0.5rem;
+  vertical-align: bottom;
 }

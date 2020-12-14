@@ -15,14 +15,15 @@ import './ngm-map-configuration.js';
 import QueryManager from '../query/QueryManager.js';
 import {getZoomToPosition} from '../permalink';
 import Cartesian3 from 'cesium/Source/Core/Cartesian3';
-import SceneTransforms from 'cesium/Source/Scene/SceneTransforms';
 import HeadingPitchRange from 'cesium/Source/Core/HeadingPitchRange';
 import BoundingSphere from 'cesium/Source/Core/BoundingSphere';
 import ScreenSpaceEventHandler from 'cesium/Source/Core/ScreenSpaceEventHandler';
 import ScreenSpaceEventType from 'cesium/Source/Core/ScreenSpaceEventType';
+import CMath from 'cesium/Source/Core/Math';
 import {showWarning} from '../message';
 
 const WELCOME_PANEL = 'welcome-panel';
+const CATALOG_PANEL = 'catalog-panel';
 const TOOLBOX = 'ngm-toolbox';
 
 class LeftSideBar extends I18nMixin(LitElement) {
@@ -34,8 +35,10 @@ class LeftSideBar extends I18nMixin(LitElement) {
       catalogLayers: {type: Object},
       activeLayers: {type: Object},
       hideWelcome: {type: Boolean},
+      hideCatalog: {type: Boolean},
       mapChooser: {type: Function},
       authenticated: {type: Boolean},
+      globeQueueLength_: {type: Number},
     };
   }
 
@@ -63,12 +66,12 @@ class LeftSideBar extends I18nMixin(LitElement) {
         </div>
       </div>
 
-      <div class="ui styled accordion">
-        <div class="title ngmlightgrey active">
+      <div class="ui styled accordion" id="${CATALOG_PANEL}">
+        <div class="title ngmlightgrey ${!this.hideCatalog ? 'active' : ''}">
           <i class="dropdown icon"></i>
           ${i18next.t('lyr_geocatalog_label')}
         </div>
-        <div class="content ngm-layer-content active">
+        <div class="content ngm-layer-content ${!this.hideCatalog ? 'active' : ''}">
           <ngm-catalog
             .layers=${this.catalogLayers}
             .authenticated=${this.authenticated}
@@ -92,7 +95,12 @@ class LeftSideBar extends I18nMixin(LitElement) {
             .actions=${this.layerActions}
             @zoomTo=${evt => this.zoomTo(evt.detail)}>
           </ngm-layers>
-          <h4 class="ui horizontal divider ngm-background-divider">${i18next.t('dtd_background_map_label')}</h4>
+          <h5 class="ui horizontal divider header">
+            ${i18next.t('dtd_background_map_label')}
+            <div class="ui ${this.globeQueueLength_ > 0 ? 'active' : ''} inline mini loader">
+              <span class="small_load_counter">${this.globeQueueLength_}</span>
+            </div>
+          </h5>
            <ngm-map-configuration .viewer=${this.viewer} .mapChooser=${this.mapChooser}></ngm-map-configuration>
         </div>
       </div>
@@ -211,6 +219,9 @@ class LeftSideBar extends I18nMixin(LitElement) {
         this.catalogLayers = [...defaultLayerTree];
         this.initializeActiveLayers();
       }
+      this.viewer.scene.globe.tileLoadProgressEvent.addEventListener(queueLength => {
+        this.globeQueueLength_ = queueLength;
+      });
     }
     if (this.searchedFeature) {
       this.queryManager.selectTile(this.searchedFeature);
@@ -220,7 +231,7 @@ class LeftSideBar extends I18nMixin(LitElement) {
   }
 
   updated(changedProperties) {
-    if (!this.accordionInited) {
+    if (this.viewer && !this.accordionInited) {
       this.initBarAccordions();
     }
 
@@ -359,6 +370,12 @@ class LeftSideBar extends I18nMixin(LitElement) {
         });
         break;
       }
+      case CATALOG_PANEL: {
+        accordion(element, {
+          onChange: () => this.dispatchEvent(new CustomEvent('catalog_panel_changed'))
+        });
+        break;
+      }
       case TOOLBOX: {
         accordion(element, {
           animateChildren: false,
@@ -394,10 +411,14 @@ class LeftSideBar extends I18nMixin(LitElement) {
   zoomToPermalinkObject() {
     const zoomToPosition = getZoomToPosition();
     if (zoomToPosition) {
-      let altitude = this.viewer.scene.globe.getHeight(this.viewer.scene.camera.positionCartographic) || 0;
-      const cartesianPosition = Cartesian3.fromDegrees(zoomToPosition.longitude, zoomToPosition.latitude, zoomToPosition.height + altitude);
+      let altitude = undefined, cartesianPosition = undefined, windowPosition = undefined;
+      const updateValues = () => {
+        altitude = this.viewer.scene.globe.getHeight(this.viewer.scene.camera.positionCartographic) || 0;
+        cartesianPosition = Cartesian3.fromDegrees(zoomToPosition.longitude, zoomToPosition.latitude, zoomToPosition.height + altitude);
+        windowPosition = this.viewer.scene.cartesianToCanvasCoordinates(cartesianPosition);
+      };
+      updateValues();
       const completeCallback = () => {
-        const windowPosition = SceneTransforms.wgs84ToWindowCoordinates(this.viewer.scene, cartesianPosition);
         if (windowPosition) {
           let maxTries = 25;
           let triesCounter = 0;
@@ -405,14 +426,10 @@ class LeftSideBar extends I18nMixin(LitElement) {
           eventHandler.setInputAction(event => maxTries = 0, ScreenSpaceEventType.LEFT_DOWN);
           // Waits while will be possible to select an object
           const tryToSelect = () => setTimeout(() => {
-            const currentAltitude = this.viewer.scene.globe.getHeight(this.viewer.scene.camera.positionCartographic) || 0;
-            if (altitude !== currentAltitude) {
-              altitude = currentAltitude;
-              const cartesianPosition = Cartesian3.fromDegrees(zoomToPosition.longitude, zoomToPosition.latitude, zoomToPosition.height + altitude);
-              this.zoomToObjectCoordinates(cartesianPosition);
-            }
-            triesCounter += 1;
+            updateValues();
+            this.zoomToObjectCoordinates(cartesianPosition);
             this.queryManager.pickObject(windowPosition);
+            triesCounter += 1;
             if (!this.queryManager.objectSelector.selectedObj && triesCounter <= maxTries) {
               tryToSelect();
             } else {
@@ -432,7 +449,10 @@ class LeftSideBar extends I18nMixin(LitElement) {
 
   zoomToObjectCoordinates(center, complete) {
     const boundingSphere = new BoundingSphere(center, 1000);
-    const zoomHeadingPitchRange = new HeadingPitchRange(0, Math.PI / 8, boundingSphere.radius);
+    const zoomHeadingPitchRange = new HeadingPitchRange(
+      0,
+      -CMath.toRadians(45),
+      boundingSphere.radius);
     this.viewer.scene.camera.flyToBoundingSphere(boundingSphere, {
       duration: 0,
       offset: zoomHeadingPitchRange,
